@@ -17,6 +17,7 @@ const ids = [
 const inputs = {};
 const metricsEl = document.getElementById('results-metrics');
 const metricRatioEl = document.getElementById('metric-ratio');
+const metricRackLeafEl = document.getElementById('metric-rack-leaf');
 const metricFabricBwEl = document.getElementById('metric-fabric-bw');
 const metricFailureEl = document.getElementById('metric-failure');
 const metricSpineUtilEl = document.getElementById('metric-spine-util');
@@ -222,6 +223,14 @@ function updateMetrics(fd) {
   // Oversubscription
   setMetric(metricRatioEl, ratio.toFixed(2), ':1', assessment, sev);
 
+  // Rack / Leaf layout
+  const racks = fd.totalRacks;
+  const lpr = fd.leavesPerRack;
+  const leafLabel = lpr > 1
+    ? `${lpr} leaves per rack`
+    : `${fd.leafCount} leaves (1 per rack)`;
+  setMetric(metricRackLeafEl, racks, ' racks', leafLabel, 'info');
+
   // Fabric uplink BW
   const bwTbps = (fd.bisectionalBw / 1000).toFixed(1);
   const linkCount = fd.leafCount * fd.leafUplinks;
@@ -246,6 +255,8 @@ function updateMetrics(fd) {
   metricsEl.dataset.resultFailureRatio = failRatio === Infinity ? 'inf' : failRatio.toFixed(2);
   metricsEl.dataset.resultSpineUtil = util.toFixed(1);
   metricsEl.dataset.resultCrossRackPct = fd.crossRackPct;
+  metricsEl.dataset.resultLeavesPerRack = fd.leavesPerRack;
+  metricsEl.dataset.resultTotalRacks = fd.totalRacks;
 }
 
 function updateMetricsWithFailure(fd, failedSpines) {
@@ -282,6 +293,7 @@ function updateMetricsWithFailure(fd, failedSpines) {
 
 function updateMetricsError(error) {
   setMetric(metricRatioEl, '—', ':1', 'Error', 'danger');
+  setMetric(metricRackLeafEl, '—', ' racks', '—', 'info');
   setMetric(metricFabricBwEl, '—', ' Tbps', '—', 'info');
   setMetric(metricFailureEl, '—', ':1', '—', 'info');
   setMetric(metricSpineUtilEl, '—', '%', '—', 'info');
@@ -320,6 +332,8 @@ function updateResultsJSON(fd) {
       uplinkBwPerLeaf: lc.uplinkBw,
       fabricUplinkBw: fd.bisectionalBw,
       totalHostBw: fd.totalHostBw,
+      totalRacks: fd.totalRacks,
+      leavesPerRack: fd.leavesPerRack,
       crossRackTrafficPct: fd.crossRackPct,
       spineUtilizationPct: parseFloat(fd.spineUtilizationPct.toFixed(1)),
       spinePortsUsed: fd.spinePortsUsed,

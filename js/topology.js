@@ -178,10 +178,10 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
       rx: 10, class: 'topo-leaf',
     });
 
-    const label = svgText(pos.cx, pos.y + nodeH.leaf / 2 + 4, `Leaf-${l + 1} · ${nodes}`, 'topo-label');
+    const label = svgText(pos.cx, pos.y + nodeH.leaf / 2 + 4, `Leaf-${l + 1} · R${l + 1}`, 'topo-label');
 
     const title = svgEl('title');
-    title.textContent = `Leaf-${l + 1}: ${nodes} nodes, ${lc.ratioStr} ratio, ${lc.downlinkBw}G down / ${lc.uplinkBw}G up`;
+    title.textContent = `Leaf-${l + 1} (Rack ${l + 1}): ${nodes} nodes, ${lc.ratioStr} ratio, ${lc.downlinkBw}G down / ${lc.uplinkBw}G up`;
 
     const g = svgEl('g');
     g.appendChild(title);
@@ -223,10 +223,10 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
       }
     }
 
-    // Host count label
+    // Host count label — show rack number
     svg.appendChild(svgText(
       pos.cx, hostY + rows * hostRowH + 16,
-      `${nodes} nodes · ${nicsPerNode}×${nicSpeed}G`,
+      `Rack ${l + 1}: ${nodes} nodes · ${nicsPerNode}×${nicSpeed}G`,
       'topo-label-muted'
     ));
   }

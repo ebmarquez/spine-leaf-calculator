@@ -52,6 +52,8 @@ After the page loads with parameters, results are available in:
    - `data-result-failure-ratio` — ratio after single spine failure
    - `data-result-spine-util` — spine utilization percentage
    - `data-result-cross-rack-pct` — cross-rack traffic percentage
+   - `data-result-leaves-per-rack` — leaf switches per rack
+   - `data-result-total-racks` — total number of racks in the fabric
 
 ## Oversubscription Assessment Scale
 

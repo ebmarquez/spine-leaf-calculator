@@ -161,6 +161,11 @@ export function fabricDesign({
     ? Math.round((uplinksLostPerLeaf / leafUplinks) * 1000) / 10
     : 0;
 
+  // Rack-to-leaf mapping
+  const portsPerRack = nodesPerLeaf.length > 0 ? nodesPerLeaf[0] * nicsPerNode : 0;
+  const leavesPerRack = leafHostPorts > 0 ? Math.ceil(portsPerRack / leafHostPorts) : 1;
+  const totalRacks = leafCount; // in standard spine-leaf, 1 leaf = 1 rack (ToR)
+
   return {
     totalNodes,
     nicsPerNode,
@@ -183,6 +188,9 @@ export function fabricDesign({
     totalHostBw,
     bisectionalBw,
     crossRackPct,
+    // Rack/leaf mapping
+    leavesPerRack,
+    totalRacks,
     // Failure
     spineFailureBwLossPct: bwLossPct,
     spineFailureRatio: failedRatio,
