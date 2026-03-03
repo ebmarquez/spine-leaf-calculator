@@ -10,7 +10,7 @@ import { exportSVG } from './export.js';
 // ---------- DOM refs ----------
 const ids = [
   'total-nodes', 'nodes-per-rack', 'nics-per-node', 'nic-speed',
-  'leaf-host-ports', 'leaf-uplinks', 'uplink-speed',
+  'leaf-host-ports', 'leaves-per-rack', 'leaf-uplinks', 'uplink-speed',
   'spine-count', 'spine-ports', 'target-ratio',
 ];
 
@@ -81,6 +81,7 @@ function loadFromURL() {
     'nics': 'nics-per-node',
     'nic-speed': 'nic-speed',
     'leaf-ports': 'leaf-host-ports',
+    'leaves-per-rack': 'leaves-per-rack',
     'leaf-uplinks': 'leaf-uplinks',
     'uplink-speed': 'uplink-speed',
     'spine-count': 'spine-count',
@@ -112,6 +113,7 @@ function updateURL() {
     'nics-per-node': 'nics',
     'nic-speed': 'nic-speed',
     'leaf-host-ports': 'leaf-ports',
+    'leaves-per-rack': 'leaves-per-rack',
     'leaf-uplinks': 'leaf-uplinks',
     'uplink-speed': 'uplink-speed',
     'spine-count': 'spine-count',
@@ -148,6 +150,7 @@ function recalculate() {
   const nicsPerNode = getVal('nics-per-node');
   const nicSpeed = getVal('nic-speed');
   const leafHostPorts = getVal('leaf-host-ports');
+  const leavesPerRackOverride = getVal('leaves-per-rack'); // 0 = auto
   const leafUplinks = getVal('leaf-uplinks');
   const uplinkSpeed = getVal('uplink-speed');
   const spineCount = getVal('spine-count');
@@ -168,6 +171,7 @@ function recalculate() {
     leafHostPorts, leafUplinks, uplinkSpeed,
     spinePorts, spineSpeed: uplinkSpeed, spineCount,
     nodesPerRack,
+    leavesPerRackOverride: leavesPerRackOverride || null,
   });
 
   currentFd = fd;
@@ -200,6 +204,7 @@ function recalculate() {
     leafHostPorts, uplinkSpeed,
     spinePorts, spineSpeed: uplinkSpeed, spineCount,
     maxUplinks: Math.min(Math.max(leafUplinks + 4, 8), 16),
+    leavesPerRackOverride: leavesPerRackOverride || null,
   });
   renderSweep(sweepContainer, sweepResults);
 
@@ -209,6 +214,7 @@ function recalculate() {
     leafHostPorts,
     targetRatio,
     spineCount: null, // auto
+    leavesPerRackOverride: leavesPerRackOverride || null,
   });
   renderRecommend(recommendContainer, recOptions, {
     totalNodes, nodesPerRack, nicsPerNode, nicSpeed, targetRatio,

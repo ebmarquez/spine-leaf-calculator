@@ -91,6 +91,7 @@ export function fabricDesign({
   spineSpeed,
   spineCount,
   nodesPerRack = null,
+  leavesPerRackOverride = null,
 }) {
   const maxNodesPerLeaf = Math.floor(leafHostPorts / nicsPerNode);
 
@@ -100,28 +101,35 @@ export function fabricDesign({
     // Rack-aware layout: respect rack boundaries
     totalRacks = Math.ceil(totalNodes / nodesPerRack);
 
-    // Determine leaves per rack: find fewest leaves where NICs divide evenly
-    // and nodesPerRack × nicsPerLeaf ≤ leafHostPorts
-    // Prefer even divisors of nicsPerNode (1, 2, 4) for symmetric NIC distribution
-    leavesPerRack = 1;
-    nicsPerLeaf = nicsPerNode;
-    for (let l = 1; l <= nicsPerNode; l++) {
-      if (nicsPerNode % l !== 0) continue; // only even divisors
-      const npl = nicsPerNode / l;
-      if (nodesPerRack * npl <= leafHostPorts) {
-        leavesPerRack = l;
-        nicsPerLeaf = npl;
-        break;
-      }
-    }
-    // Fallback: if no even divisor works, use brute-force
-    if (nodesPerRack * nicsPerLeaf > leafHostPorts) {
-      for (let l = 2; l <= nodesPerRack * nicsPerNode; l++) {
-        const npl = Math.ceil(nicsPerNode / l);
-        if (npl > 0 && nodesPerRack * npl <= leafHostPorts) {
+    if (leavesPerRackOverride && leavesPerRackOverride > 0) {
+      // User-specified leaves per rack
+      leavesPerRack = leavesPerRackOverride;
+      nicsPerLeaf = leavesPerRack > 1
+        ? Math.ceil(nicsPerNode / leavesPerRack)
+        : nicsPerNode;
+    } else {
+      // Auto-detect: find fewest leaves where NICs divide evenly
+      // and nodesPerRack × nicsPerLeaf ≤ leafHostPorts
+      leavesPerRack = 1;
+      nicsPerLeaf = nicsPerNode;
+      for (let l = 1; l <= nicsPerNode; l++) {
+        if (nicsPerNode % l !== 0) continue;
+        const npl = nicsPerNode / l;
+        if (nodesPerRack * npl <= leafHostPorts) {
           leavesPerRack = l;
           nicsPerLeaf = npl;
           break;
+        }
+      }
+      // Fallback: if no even divisor works, use brute-force
+      if (nodesPerRack * nicsPerLeaf > leafHostPorts) {
+        for (let l = 2; l <= nodesPerRack * nicsPerNode; l++) {
+          const npl = Math.ceil(nicsPerNode / l);
+          if (npl > 0 && nodesPerRack * npl <= leafHostPorts) {
+            leavesPerRack = l;
+            nicsPerLeaf = npl;
+            break;
+          }
         }
       }
     }
@@ -254,6 +262,7 @@ export function fabricDesign({
 export function sweepUplinks({
   totalNodes,
   nodesPerRack = null,
+  leavesPerRackOverride = null,
   nicsPerNode,
   nicSpeed,
   leafHostPorts,
@@ -276,6 +285,7 @@ export function sweepUplinks({
       spineSpeed,
       spineCount,
       nodesPerRack,
+      leavesPerRackOverride,
     });
     if (!fd.error) results.push(fd);
   }
@@ -291,6 +301,7 @@ export function recommendFabric({
   nicsPerNode,
   nicSpeed,
   leafHostPorts = null,
+  leavesPerRackOverride = null,
   targetRatio = 2.0,
   spineCount = null,
   uplinkSpeeds = null,
@@ -300,18 +311,24 @@ export function recommendFabric({
   if (!spinePortOptions) spinePortOptions = SPINE_PORT_OPTIONS;
 
   // Determine leaf config using rack-aware logic
-  // Find leavesPerRack and nicsPerLeaf using the same algorithm as fabricDesign
   let leavesPerRack = 1;
   let nicsPerLeaf = nicsPerNode;
   if (!leafHostPorts) leafHostPorts = nodesPerRack * nicsPerNode;
 
-  for (let l = 1; l <= nicsPerNode; l++) {
-    if (nicsPerNode % l !== 0) continue;
-    const npl = nicsPerNode / l;
-    if (nodesPerRack * npl <= leafHostPorts) {
-      leavesPerRack = l;
-      nicsPerLeaf = npl;
-      break;
+  if (leavesPerRackOverride && leavesPerRackOverride > 0) {
+    leavesPerRack = leavesPerRackOverride;
+    nicsPerLeaf = leavesPerRack > 1
+      ? Math.ceil(nicsPerNode / leavesPerRack)
+      : nicsPerNode;
+  } else {
+    for (let l = 1; l <= nicsPerNode; l++) {
+      if (nicsPerNode % l !== 0) continue;
+      const npl = nicsPerNode / l;
+      if (nodesPerRack * npl <= leafHostPorts) {
+        leavesPerRack = l;
+        nicsPerLeaf = npl;
+        break;
+      }
     }
   }
 
@@ -353,6 +370,7 @@ export function recommendFabric({
           spineSpeed: ulSpeed,
           spineCount: spines,
           nodesPerRack,
+          leavesPerRackOverride,
         });
         if (fd.error) continue;
 

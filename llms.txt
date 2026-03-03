@@ -25,6 +25,7 @@ Base URL: https://ebmarquez.github.io/spine-leaf-calculator/
 | nics           | int    | 2       | Total NICs per node (split across leaf pair) |
 | nic-speed      | int    | 25      | NIC speed in Gbps                    |
 | leaf-ports     | int    | 48      | Host-facing ports per leaf switch     |
+| leaves-per-rack| int    | 0       | Leaves per rack (0=auto, 1, 2, 4)    |
 | leaf-uplinks   | int    | 6       | Uplink ports per leaf to spine tier   |
 | uplink-speed   | int    | 100     | Leaf uplink speed in Gbps            |
 | spine-count    | int    | 2       | Number of spine switches              |

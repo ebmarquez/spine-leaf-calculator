@@ -83,6 +83,17 @@
               <input type="number" id="leaf-host-ports" value="48" min="1" max="128">
             </div>
             <div class="field">
+              <label for="leaves-per-rack">Leaves / Rack</label>
+              <select id="leaves-per-rack">
+                <option value="0" selected>Auto</option>
+                <option value="1">1</option>
+                <option value="2">2 (MLAG pair)</option>
+                <option value="4">4</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
               <label for="leaf-uplinks">Uplinks</label>
               <input type="number" id="leaf-uplinks" value="6" min="1" max="32">
             </div>
