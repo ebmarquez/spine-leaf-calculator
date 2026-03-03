@@ -88,16 +88,44 @@ export function fabricDesign({
   spinePorts,
   spineSpeed,
   spineCount,
+  nodesPerRack = null,
 }) {
   const maxNodesPerLeaf = Math.floor(leafHostPorts / nicsPerNode);
-  const leafCount = Math.ceil(totalNodes / maxNodesPerLeaf);
 
-  // Distribute nodes evenly across leaves
-  const base = Math.floor(totalNodes / leafCount);
-  const remainder = totalNodes % leafCount;
-  const nodesPerLeaf = Array.from({ length: leafCount }, (_, i) =>
-    i < remainder ? base + 1 : base
-  );
+  let leafCount, nodesPerLeaf, leavesPerRack, totalRacks;
+
+  if (nodesPerRack && nodesPerRack > 0) {
+    // Rack-aware layout: respect rack boundaries
+    totalRacks = Math.ceil(totalNodes / nodesPerRack);
+    leavesPerRack = Math.ceil(nodesPerRack / maxNodesPerLeaf);
+    leafCount = totalRacks * leavesPerRack;
+
+    // Distribute nodes across racks, then within each rack across its leaves
+    nodesPerLeaf = [];
+    let remaining = totalNodes;
+    for (let r = 0; r < totalRacks; r++) {
+      const rackNodes = Math.min(remaining, nodesPerRack);
+      remaining -= rackNodes;
+      // Split this rack's nodes across its leaves
+      const perLeaf = Math.floor(rackNodes / leavesPerRack);
+      const extra = rackNodes % leavesPerRack;
+      for (let l = 0; l < leavesPerRack; l++) {
+        nodesPerLeaf.push(l < extra ? perLeaf + 1 : perLeaf);
+      }
+    }
+  } else {
+    // Legacy mode: pack leaves to max capacity, no rack boundaries
+    leafCount = Math.ceil(totalNodes / maxNodesPerLeaf);
+    leavesPerRack = 1;
+    totalRacks = leafCount;
+
+    // Distribute nodes evenly across leaves
+    const base = Math.floor(totalNodes / leafCount);
+    const remainder = totalNodes % leafCount;
+    nodesPerLeaf = Array.from({ length: leafCount }, (_, i) =>
+      i < remainder ? base + 1 : base
+    );
+  }
 
   // Leaf tier calculations
   const leafCalcs = nodesPerLeaf.map(n =>
@@ -160,11 +188,6 @@ export function fabricDesign({
   const bwLossPct = leafUplinks
     ? Math.round((uplinksLostPerLeaf / leafUplinks) * 1000) / 10
     : 0;
-
-  // Rack-to-leaf mapping
-  const portsPerRack = nodesPerLeaf.length > 0 ? nodesPerLeaf[0] * nicsPerNode : 0;
-  const leavesPerRack = leafHostPorts > 0 ? Math.ceil(portsPerRack / leafHostPorts) : 1;
-  const totalRacks = leafCount; // in standard spine-leaf, 1 leaf = 1 rack (ToR)
 
   return {
     totalNodes,

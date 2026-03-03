@@ -167,6 +167,7 @@ function recalculate() {
     totalNodes, nicsPerNode, nicSpeed,
     leafHostPorts, leafUplinks, uplinkSpeed,
     spinePorts, spineSpeed: uplinkSpeed, spineCount,
+    nodesPerRack,
   });
 
   currentFd = fd;

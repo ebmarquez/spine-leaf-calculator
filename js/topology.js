@@ -28,7 +28,7 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
   }
 
   const failedSpines = new Set();
-  const { spineCount, leafCount, nodesPerLeaf, leafUplinks, uplinkSpeed, nicsPerNode, nicSpeed, spinePorts, spinePortsUsed } = fd;
+  const { spineCount, leafCount, nodesPerLeaf, leafUplinks, uplinkSpeed, nicsPerNode, nicSpeed, spinePorts, spinePortsUsed, leavesPerRack, totalRacks } = fd;
 
   // Layout constants
   const margin = { top: 20, left: 70, right: 30, bottom: 20 };
@@ -178,10 +178,15 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
       rx: 10, class: 'topo-leaf',
     });
 
-    const label = svgText(pos.cx, pos.y + nodeH.leaf / 2 + 4, `Leaf-${l + 1} · R${l + 1}`, 'topo-label');
+    const rackIdx = Math.floor(l / leavesPerRack) + 1;
+    const leafInRack = (l % leavesPerRack) + 1;
+    const leafLabel = leavesPerRack > 1
+      ? `L${l + 1} · R${rackIdx}(${leafInRack}/${leavesPerRack})`
+      : `Leaf-${l + 1} · R${rackIdx}`;
+    const label = svgText(pos.cx, pos.y + nodeH.leaf / 2 + 4, leafLabel, 'topo-label');
 
     const title = svgEl('title');
-    title.textContent = `Leaf-${l + 1} (Rack ${l + 1}): ${nodes} nodes, ${lc.ratioStr} ratio, ${lc.downlinkBw}G down / ${lc.uplinkBw}G up`;
+    title.textContent = `Leaf-${l + 1} (Rack ${rackIdx}${leavesPerRack > 1 ? `, leaf ${leafInRack} of ${leavesPerRack}` : ''}): ${nodes} nodes, ${lc.ratioStr} ratio, ${lc.downlinkBw}G down / ${lc.uplinkBw}G up`;
 
     const g = svgEl('g');
     g.appendChild(title);
@@ -224,9 +229,10 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
     }
 
     // Host count label — show rack number
+    const hostRackIdx = Math.floor(l / leavesPerRack) + 1;
     svg.appendChild(svgText(
       pos.cx, hostY + rows * hostRowH + 16,
-      `Rack ${l + 1}: ${nodes} nodes · ${nicsPerNode}×${nicSpeed}G`,
+      `Rack ${hostRackIdx}: ${nodes} nodes · ${nicsPerNode}×${nicSpeed}G`,
       'topo-label-muted'
     ));
   }
