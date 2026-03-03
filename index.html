@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spine-Leaf Fabric Calculator</title>
+  <meta name="description" content="Interactive tool for designing data center spine-leaf fabrics. Calculate oversubscription ratios, explore configurations, and visualize topologies.">
+  <meta name="author" content="Eric Marquez">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/styles.css">
+
+  <!-- JSON-LD schema for AI/search discovery -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Spine-Leaf Fabric Calculator",
+    "description": "Interactive tool for designing data center spine-leaf fabrics. Calculate oversubscription ratios, explore configurations, and visualize topologies.",
+    "url": "https://ebmarquez.github.io/spine-leaf-calculator/",
+    "applicationCategory": "NetworkingTool",
+    "operatingSystem": "Any (web browser)",
+    "offers": { "@type": "Offer", "price": "0" },
+    "author": { "@type": "Person", "name": "Eric Marquez" }
+  }
+  </script>
+</head>
+<body>
+  <!-- Accent gradient bar -->
+  <div class="accent-bar" role="presentation"></div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo" aria-hidden="true">SL</div>
+    <h1 class="header-title">Fabric<span>Calc</span></h1>
+    <span class="header-badge">v1.0</span>
+    <nav class="header-nav" aria-label="Main navigation">
+      <a href="#" aria-current="page">Calculator</a>
+      <a href="llms.txt">API Docs</a>
+      <a href="https://github.com/ebmarquez/spine-leaf-calculator" target="_blank" rel="noopener">GitHub</a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
+    </nav>
+  </header>
+
+  <!-- Main layout -->
+  <div class="main-layout">
+    <!-- Sidebar: Inputs -->
+    <aside class="sidebar" aria-label="Fabric configuration">
+      <form id="fabric-form" autocomplete="off">
+        <!-- Host Layer -->
+        <div class="form-section">
+          <div class="form-section-title">Host Layer</div>
+          <div class="field">
+            <label for="total-nodes">Total Cluster Nodes</label>
+            <input type="number" id="total-nodes" value="64" min="1" max="1024">
+          </div>
+          <div class="field">
+            <label for="nodes-per-rack">Nodes per Rack</label>
+            <input type="number" id="nodes-per-rack" value="16" min="1" max="128">
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="nics-per-node">NICs / Node</label>
+              <input type="number" id="nics-per-node" value="2" min="1" max="8">
+            </div>
+            <div class="field">
+              <label for="nic-speed">NIC Speed</label>
+              <select id="nic-speed">
+                <option value="10">10 Gbps</option>
+                <option value="25" selected>25 Gbps</option>
+                <option value="50">50 Gbps</option>
+                <option value="100">100 Gbps</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Leaf Switch -->
+        <div class="form-section">
+          <div class="form-section-title">Leaf Switch (ToR)</div>
+          <div class="field-row">
+            <div class="field">
+              <label for="leaf-host-ports">Host Ports</label>
+              <input type="number" id="leaf-host-ports" value="48" min="1" max="128">
+            </div>
+            <div class="field">
+              <label for="leaf-uplinks">Uplinks</label>
+              <input type="number" id="leaf-uplinks" value="6" min="1" max="32">
+            </div>
+          </div>
+          <div class="field">
+            <label for="uplink-speed">Uplink Speed</label>
+            <select id="uplink-speed">
+              <option value="10">10 Gbps</option>
+              <option value="25">25 Gbps</option>
+              <option value="40">40 Gbps</option>
+              <option value="50">50 Gbps</option>
+              <option value="100" selected>100 Gbps</option>
+              <option value="200">200 Gbps</option>
+              <option value="400">400 Gbps</option>
+              <option value="800">800 Gbps</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Spine Switch -->
+        <div class="form-section">
+          <div class="form-section-title">Spine Switch</div>
+          <div class="field-row">
+            <div class="field">
+              <label for="spine-count">Spine Count</label>
+              <input type="number" id="spine-count" value="2" min="1" max="8">
+            </div>
+            <div class="field">
+              <label for="spine-ports">Ports / Spine</label>
+              <input type="number" id="spine-ports" value="36" min="1" max="128">
+            </div>
+          </div>
+        </div>
+
+        <!-- Recommend target -->
+        <div class="form-section">
+          <div class="form-section-title">Recommendation Target</div>
+          <div class="field">
+            <label for="target-ratio">Target Ratio</label>
+            <input type="number" id="target-ratio" value="2.0" min="0.5" max="10" step="0.1">
+          </div>
+        </div>
+      </form>
+    </aside>
+
+    <!-- Content area -->
+    <main class="content-area" aria-label="Calculation results">
+      <!-- Metric cards -->
+      <div class="metrics-grid" id="results-metrics"
+           data-result-ratio=""
+           data-result-assessment=""
+           data-result-fabric-bw=""
+           data-result-failure-ratio=""
+           data-result-spine-util=""
+           data-result-cross-rack-pct="">
+        <div class="metric-card" id="metric-ratio">
+          <div class="metric-label">Oversubscription</div>
+          <div class="metric-value">—<span>:1</span></div>
+          <div class="metric-tag tag-info">Calculating…</div>
+        </div>
+        <div class="metric-card" id="metric-fabric-bw">
+          <div class="metric-label">Fabric Uplink</div>
+          <div class="metric-value">—<span> Tbps</span></div>
+          <div class="metric-tag tag-info">—</div>
+        </div>
+        <div class="metric-card" id="metric-failure">
+          <div class="metric-label">Spine Failure</div>
+          <div class="metric-value">—<span>:1</span></div>
+          <div class="metric-tag tag-info">—</div>
+        </div>
+        <div class="metric-card" id="metric-spine-util">
+          <div class="metric-label">Spine Util</div>
+          <div class="metric-value">—<span>%</span></div>
+          <div class="metric-tag tag-info">—</div>
+        </div>
+      </div>
+
+      <!-- Tabbed panel -->
+      <div class="panel-card">
+        <div class="tab-bar" role="tablist" aria-label="View modes">
+          <button class="tab-btn active" role="tab" aria-selected="true" data-tab="topology" id="tab-topology">Topology</button>
+          <button class="tab-btn" role="tab" aria-selected="false" data-tab="sweep" id="tab-sweep">Uplink Sweep</button>
+          <button class="tab-btn" role="tab" aria-selected="false" data-tab="recommend" id="tab-recommend">Recommendations</button>
+          <div class="tab-actions">
+            <button class="btn-export" id="btn-export-svg" title="Download topology as SVG">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              SVG
+            </button>
+          </div>
+        </div>
+
+        <!-- Topology panel -->
+        <div class="tab-panel active" role="tabpanel" id="panel-topology" aria-labelledby="tab-topology">
+          <div class="topology-container" id="topology-container" aria-label="Spine-leaf fabric topology diagram">
+          </div>
+          <p class="topology-hint">💡 Click a spine switch to simulate failure</p>
+        </div>
+
+        <!-- Sweep panel -->
+        <div class="tab-panel" role="tabpanel" id="panel-sweep" aria-labelledby="tab-sweep">
+          <div id="sweep-container"></div>
+        </div>
+
+        <!-- Recommend panel -->
+        <div class="tab-panel" role="tabpanel" id="panel-recommend" aria-labelledby="tab-recommend">
+          <div id="recommend-container"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Machine-readable results for AI agents -->
+  <script type="application/json" id="results-json">{}</script>
+
+  <!-- App -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

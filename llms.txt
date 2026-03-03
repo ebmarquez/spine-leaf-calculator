@@ -1,0 +1,66 @@
+# Spine-Leaf Fabric Calculator
+
+> An interactive web tool for designing data center spine-leaf fabrics.
+> Calculate oversubscription ratios, explore configurations, and visualize topologies.
+
+## What This Tool Does
+
+This is a spine-leaf data center fabric oversubscription calculator.
+Given a cluster size (nodes), NIC configuration, leaf switch specs, and spine switch specs,
+it calculates the oversubscription ratio, fabric bandwidth, cross-rack traffic probability,
+and spine failure impact. It also recommends optimal configurations.
+
+## How to Use via URL Parameters
+
+Load the page with query parameters to pre-populate inputs and auto-calculate:
+
+Base URL: https://ebmarquez.github.io/spine-leaf-calculator/
+
+### Available Parameters
+
+| Parameter      | Type   | Default | Description                          |
+|----------------|--------|---------|--------------------------------------|
+| nodes          | int    | 64      | Total cluster nodes                  |
+| nodes-per-rack | int    | 16      | Nodes per rack                       |
+| nics           | int    | 2       | NICs per node (to single leaf)       |
+| nic-speed      | int    | 25      | NIC speed in Gbps                    |
+| leaf-ports     | int    | 48      | Host-facing ports per leaf switch     |
+| leaf-uplinks   | int    | 6       | Uplink ports per leaf to spine tier   |
+| uplink-speed   | int    | 100     | Leaf uplink speed in Gbps            |
+| spine-count    | int    | 2       | Number of spine switches              |
+| spine-ports    | int    | 36      | Total ports per spine switch          |
+| target-ratio   | float  | 2.0     | Target oversubscription ratio         |
+| tab            | string | design  | Active view: design, sweep, recommend |
+
+### Example URLs
+
+- Default 64-node: `?nodes=64&nics=2&nic-speed=25`
+- 32-node 100G: `?nodes=32&nics=2&nic-speed=100&uplink-speed=400&spine-ports=64`
+- Show recommendations: `?nodes=64&nodes-per-rack=16&tab=recommend`
+- Custom target: `?nodes=64&nodes-per-rack=16&target-ratio=3.0&tab=recommend`
+
+## How to Read Results Programmatically
+
+After the page loads with parameters, results are available in:
+
+1. **JSON block**: `document.getElementById('results-json').textContent` — parse as JSON
+2. **Data attributes**: `document.querySelector('[data-result-ratio]').dataset.resultRatio`
+3. **Key data attributes on #results-metrics**:
+   - `data-result-ratio` — oversubscription ratio (float)
+   - `data-result-assessment` — human-readable assessment string
+   - `data-result-fabric-bw` — total fabric uplink bandwidth in Gbps
+   - `data-result-failure-ratio` — ratio after single spine failure
+   - `data-result-spine-util` — spine utilization percentage
+   - `data-result-cross-rack-pct` — cross-rack traffic percentage
+
+## Oversubscription Assessment Scale
+
+- ≤1.5:1 — Over-provisioned (RDMA-grade)
+- 1.5-2.0:1 — Recommended (no RDMA)
+- 2.0-3.0:1 — Acceptable (general compute)
+- 3.0-4.0:1 — Tight (watch for congestion)
+- >4.0:1 — High risk of congestion
+
+## Available Link Speeds
+
+10G, 25G, 40G, 50G, 100G, 200G, 400G, 800G

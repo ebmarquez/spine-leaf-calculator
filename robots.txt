@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ebmarquez.github.io/spine-leaf-calculator/sitemap.xml
