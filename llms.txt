@@ -22,7 +22,7 @@ Base URL: https://ebmarquez.github.io/spine-leaf-calculator/
 |----------------|--------|---------|--------------------------------------|
 | nodes          | int    | 64      | Total cluster nodes                  |
 | nodes-per-rack | int    | 16      | Nodes per rack                       |
-| nics           | int    | 2       | NICs per node (to single leaf)       |
+| nics           | int    | 2       | Total NICs per node (split across leaf pair) |
 | nic-speed      | int    | 25      | NIC speed in Gbps                    |
 | leaf-ports     | int    | 48      | Host-facing ports per leaf switch     |
 | leaf-uplinks   | int    | 6       | Uplink ports per leaf to spine tier   |
@@ -53,7 +53,17 @@ After the page loads with parameters, results are available in:
    - `data-result-spine-util` — spine utilization percentage
    - `data-result-cross-rack-pct` — cross-rack traffic percentage
    - `data-result-leaves-per-rack` — leaf switches per rack
+   - `data-result-nics-per-leaf` — NICs per node connecting to each leaf
    - `data-result-total-racks` — total number of racks in the fabric
+
+## Dual-Homed Topology
+
+When nodes-per-rack × nics > leaf-ports, the tool auto-detects a dual-homed
+(MLAG/leaf-pair) topology. NICs are evenly split across leaves in each rack:
+- 2 NICs + 2 leaves/rack → 1 NIC per leaf (each node dual-homed)
+- 4 NICs + 2 leaves/rack → 2 NICs per leaf
+- Each leaf serves ALL nodes in the rack, but only its share of NICs
+- Oversubscription is calculated per-leaf using nicsPerLeaf, not nicsPerNode
 
 ## Oversubscription Assessment Scale
 

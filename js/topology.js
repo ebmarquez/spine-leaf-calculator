@@ -28,7 +28,7 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
   }
 
   const failedSpines = new Set();
-  const { spineCount, leafCount, nodesPerLeaf, leafUplinks, uplinkSpeed, nicsPerNode, nicSpeed, spinePorts, spinePortsUsed, leavesPerRack, totalRacks } = fd;
+  const { spineCount, leafCount, nodesPerLeaf, leafUplinks, uplinkSpeed, nicsPerNode, nicsPerLeaf, nicSpeed, spinePorts, spinePortsUsed, leavesPerRack, totalRacks } = fd;
 
   // Layout constants
   const margin = { top: 20, left: 70, right: 30, bottom: 20 };
@@ -165,6 +165,31 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
       if (onFailureChange) onFailureChange(failedSpines);
     });
   }
+
+  // Draw rack boundary rectangles when dual-homed
+  if (leavesPerRack > 1) {
+    for (let r = 0; r < totalRacks; r++) {
+      const firstLeafIdx = r * leavesPerRack;
+      const lastLeafIdx = firstLeafIdx + leavesPerRack - 1;
+      const firstPos = leafPositions[firstLeafIdx];
+      const lastPos = leafPositions[lastLeafIdx];
+      const rackX = firstPos.x - 8;
+      const rackW = (lastPos.x + nodeW.leaf) - firstPos.x + 16;
+      const rackRect = svgEl('rect', {
+        x: rackX, y: leafY - 10,
+        width: rackW, height: svgH - leafY + 5,
+        rx: 8, class: 'topo-rack-boundary',
+      });
+      svg.appendChild(rackRect);
+
+      // Rack label
+      svg.appendChild(svgText(
+        rackX + rackW / 2, leafY - 16,
+        `Rack ${r + 1}`,
+        'topo-rack-label'
+      ));
+    }
+  }
 
   // Draw leaf nodes
   for (let l = 0; l < leafCount; l++) {
@@ -195,9 +220,10 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
     svg.appendChild(g);
 
     // Draw host blocks under this leaf
-    const totalHostPorts = nodes * nicsPerNode;
-    const cols = Math.min(totalHostPorts, maxHostCols);
-    const rows = Math.ceil(totalHostPorts / cols);
+    // For dual-homed: each leaf sees nicsPerLeaf ports per node, not nicsPerNode
+    const portsOnThisLeaf = nodes * (nicsPerLeaf || nicsPerNode);
+    const cols = Math.min(portsOnThisLeaf, maxHostCols);
+    const rows = Math.ceil(portsOnThisLeaf / cols);
     const hostBlockW = cols * (nodeW.host + 4);
     const hostStartX = pos.cx - hostBlockW / 2;
 
@@ -218,7 +244,7 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const idx = r * cols + c;
-        if (idx >= totalHostPorts) break;
+        if (idx >= portsOnThisLeaf) break;
         svg.appendChild(svgEl('rect', {
           x: hostStartX + c * (nodeW.host + 4),
           y: hostY + r * hostRowH,
@@ -228,11 +254,14 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
       }
     }
 
-    // Host count label — show rack number
+    // Host count label — show rack number and NIC mapping
     const hostRackIdx = Math.floor(l / leavesPerRack) + 1;
+    const nicLabel = leavesPerRack > 1
+      ? `${nicsPerLeaf}×${nicSpeed}G per leaf`
+      : `${nicsPerNode}×${nicSpeed}G`;
     svg.appendChild(svgText(
       pos.cx, hostY + rows * hostRowH + 16,
-      `Rack ${hostRackIdx}: ${nodes} nodes · ${nicsPerNode}×${nicSpeed}G`,
+      `Rack ${hostRackIdx}: ${nodes} nodes · ${nicLabel}`,
       'topo-label-muted'
     ));
   }

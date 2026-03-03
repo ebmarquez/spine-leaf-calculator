@@ -44,16 +44,17 @@ export function formatLinkSpeeds(speeds) {
 
 /**
  * Per-leaf oversubscription calculation.
+ * @param nicsPerLeaf - NICs per node connecting to THIS leaf (for dual-homed: nicsPerNode / leavesPerRack)
  */
 export function leafOversubscription({
   nodesOnLeaf,
-  nicsPerNode,
+  nicsPerLeaf,
   nicSpeed,
   leafHostPorts,
   leafUplinks,
   uplinkSpeed,
 }) {
-  const portsUsed = nodesOnLeaf * nicsPerNode;
+  const portsUsed = nodesOnLeaf * nicsPerLeaf;
   if (portsUsed > leafHostPorts) {
     return { error: `Need ${portsUsed} host ports, leaf only has ${leafHostPorts}.` };
   }
@@ -64,6 +65,7 @@ export function leafOversubscription({
 
   return {
     nodes: nodesOnLeaf,
+    nicsPerLeaf,
     hostPortsUsed: portsUsed,
     hostPortsTotal: leafHostPorts,
     hostPortsFree: leafHostPorts - portsUsed,
@@ -92,32 +94,56 @@ export function fabricDesign({
 }) {
   const maxNodesPerLeaf = Math.floor(leafHostPorts / nicsPerNode);
 
-  let leafCount, nodesPerLeaf, leavesPerRack, totalRacks;
+  let leafCount, nodesPerLeaf, leavesPerRack, totalRacks, nicsPerLeaf;
 
   if (nodesPerRack && nodesPerRack > 0) {
     // Rack-aware layout: respect rack boundaries
     totalRacks = Math.ceil(totalNodes / nodesPerRack);
-    leavesPerRack = Math.ceil(nodesPerRack / maxNodesPerLeaf);
+
+    // Determine leaves per rack: find fewest leaves where NICs divide evenly
+    // and nodesPerRack × nicsPerLeaf ≤ leafHostPorts
+    // Prefer even divisors of nicsPerNode (1, 2, 4) for symmetric NIC distribution
+    leavesPerRack = 1;
+    nicsPerLeaf = nicsPerNode;
+    for (let l = 1; l <= nicsPerNode; l++) {
+      if (nicsPerNode % l !== 0) continue; // only even divisors
+      const npl = nicsPerNode / l;
+      if (nodesPerRack * npl <= leafHostPorts) {
+        leavesPerRack = l;
+        nicsPerLeaf = npl;
+        break;
+      }
+    }
+    // Fallback: if no even divisor works, use brute-force
+    if (nodesPerRack * nicsPerLeaf > leafHostPorts) {
+      for (let l = 2; l <= nodesPerRack * nicsPerNode; l++) {
+        const npl = Math.ceil(nicsPerNode / l);
+        if (npl > 0 && nodesPerRack * npl <= leafHostPorts) {
+          leavesPerRack = l;
+          nicsPerLeaf = npl;
+          break;
+        }
+      }
+    }
+
     leafCount = totalRacks * leavesPerRack;
 
-    // Distribute nodes across racks, then within each rack across its leaves
+    // Each leaf in a rack serves ALL nodes in that rack (dual-homed)
     nodesPerLeaf = [];
     let remaining = totalNodes;
     for (let r = 0; r < totalRacks; r++) {
       const rackNodes = Math.min(remaining, nodesPerRack);
       remaining -= rackNodes;
-      // Split this rack's nodes across its leaves
-      const perLeaf = Math.floor(rackNodes / leavesPerRack);
-      const extra = rackNodes % leavesPerRack;
       for (let l = 0; l < leavesPerRack; l++) {
-        nodesPerLeaf.push(l < extra ? perLeaf + 1 : perLeaf);
+        nodesPerLeaf.push(rackNodes); // each leaf sees all rack nodes
       }
     }
   } else {
-    // Legacy mode: pack leaves to max capacity, no rack boundaries
+    // Legacy mode: all NICs to one leaf, no rack boundaries
     leafCount = Math.ceil(totalNodes / maxNodesPerLeaf);
     leavesPerRack = 1;
     totalRacks = leafCount;
+    nicsPerLeaf = nicsPerNode;
 
     // Distribute nodes evenly across leaves
     const base = Math.floor(totalNodes / leafCount);
@@ -131,7 +157,7 @@ export function fabricDesign({
   const leafCalcs = nodesPerLeaf.map(n =>
     leafOversubscription({
       nodesOnLeaf: n,
-      nicsPerNode,
+      nicsPerLeaf,
       nicSpeed,
       leafHostPorts,
       leafUplinks,
@@ -167,11 +193,11 @@ export function fabricDesign({
   const bisectionalBw = totalLeafUplinks * uplinkSpeed;
   const totalHostBw = leafCalcs.reduce((sum, lc) => sum + lc.downlinkBw, 0);
 
-  // Cross-rack traffic probability
-  const avgNodes = totalNodes / leafCount;
+  // Cross-rack traffic probability (based on racks, not leaves)
+  const avgNodesPerRack = totalNodes / totalRacks;
   const crossRackPct =
     totalNodes > 1
-      ? Math.round((1 - (avgNodes - 1) / (totalNodes - 1)) * 1000) / 10
+      ? Math.round((1 - (avgNodesPerRack - 1) / (totalNodes - 1)) * 1000) / 10
       : 0;
 
   // Single spine failure analysis
@@ -192,6 +218,7 @@ export function fabricDesign({
   return {
     totalNodes,
     nicsPerNode,
+    nicsPerLeaf,
     nicSpeed,
     // Leaf tier
     leafCount,
@@ -226,6 +253,7 @@ export function fabricDesign({
  */
 export function sweepUplinks({
   totalNodes,
+  nodesPerRack = null,
   nicsPerNode,
   nicSpeed,
   leafHostPorts,
@@ -247,6 +275,7 @@ export function sweepUplinks({
       spinePorts,
       spineSpeed,
       spineCount,
+      nodesPerRack,
     });
     if (!fd.error) results.push(fd);
   }
@@ -261,6 +290,7 @@ export function recommendFabric({
   nodesPerRack,
   nicsPerNode,
   nicSpeed,
+  leafHostPorts = null,
   targetRatio = 2.0,
   spineCount = null,
   uplinkSpeeds = null,
@@ -269,9 +299,25 @@ export function recommendFabric({
   if (!uplinkSpeeds) uplinkSpeeds = AVAILABLE_LINK_SPEEDS;
   if (!spinePortOptions) spinePortOptions = SPINE_PORT_OPTIONS;
 
-  const leafHostPorts = nodesPerRack * nicsPerNode;
-  const leafCount = Math.ceil(totalNodes / nodesPerRack);
-  const downlinkBw = nodesPerRack * nicsPerNode * nicSpeed;
+  // Determine leaf config using rack-aware logic
+  // Find leavesPerRack and nicsPerLeaf using the same algorithm as fabricDesign
+  let leavesPerRack = 1;
+  let nicsPerLeaf = nicsPerNode;
+  if (!leafHostPorts) leafHostPorts = nodesPerRack * nicsPerNode;
+
+  for (let l = 1; l <= nicsPerNode; l++) {
+    if (nicsPerNode % l !== 0) continue;
+    const npl = nicsPerNode / l;
+    if (nodesPerRack * npl <= leafHostPorts) {
+      leavesPerRack = l;
+      nicsPerLeaf = npl;
+      break;
+    }
+  }
+
+  const totalRacks = Math.ceil(totalNodes / nodesPerRack);
+  const leafCount = totalRacks * leavesPerRack;
+  const downlinkBw = nodesPerRack * nicsPerLeaf * nicSpeed;
 
   const spineRange = spineCount ? [spineCount] : [2, 3, 4, 5, 6];
   const options = [];
@@ -306,6 +352,7 @@ export function recommendFabric({
           spinePorts: viableSpinePorts,
           spineSpeed: ulSpeed,
           spineCount: spines,
+          nodesPerRack,
         });
         if (fd.error) continue;
 

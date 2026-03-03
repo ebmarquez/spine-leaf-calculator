@@ -196,7 +196,7 @@ function recalculate() {
 
   // Sweep
   const sweepResults = sweepUplinks({
-    totalNodes, nicsPerNode, nicSpeed,
+    totalNodes, nodesPerRack, nicsPerNode, nicSpeed,
     leafHostPorts, uplinkSpeed,
     spinePorts, spineSpeed: uplinkSpeed, spineCount,
     maxUplinks: Math.min(Math.max(leafUplinks + 4, 8), 16),
@@ -206,6 +206,7 @@ function recalculate() {
   // Recommend
   const recOptions = recommendFabric({
     totalNodes, nodesPerRack, nicsPerNode, nicSpeed,
+    leafHostPorts,
     targetRatio,
     spineCount: null, // auto
   });
@@ -228,7 +229,7 @@ function updateMetrics(fd) {
   const racks = fd.totalRacks;
   const lpr = fd.leavesPerRack;
   const leafLabel = lpr > 1
-    ? `${lpr} leaves per rack`
+    ? `${lpr} leaves/rack · ${fd.nicsPerLeaf} NIC/leaf`
     : `${fd.leafCount} leaves (1 per rack)`;
   setMetric(metricRackLeafEl, racks, ' racks', leafLabel, 'info');
 
@@ -257,6 +258,7 @@ function updateMetrics(fd) {
   metricsEl.dataset.resultSpineUtil = util.toFixed(1);
   metricsEl.dataset.resultCrossRackPct = fd.crossRackPct;
   metricsEl.dataset.resultLeavesPerRack = fd.leavesPerRack;
+  metricsEl.dataset.resultNicsPerLeaf = fd.nicsPerLeaf;
   metricsEl.dataset.resultTotalRacks = fd.totalRacks;
 }
 
@@ -335,6 +337,7 @@ function updateResultsJSON(fd) {
       totalHostBw: fd.totalHostBw,
       totalRacks: fd.totalRacks,
       leavesPerRack: fd.leavesPerRack,
+      nicsPerLeaf: fd.nicsPerLeaf,
       crossRackTrafficPct: fd.crossRackPct,
       spineUtilizationPct: parseFloat(fd.spineUtilizationPct.toFixed(1)),
       spinePortsUsed: fd.spinePortsUsed,

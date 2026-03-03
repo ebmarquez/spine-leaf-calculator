@@ -397,6 +397,8 @@ body {
 .topo-label-muted { font-family: var(--font-sans); font-size: 9px; fill: var(--color-text-muted); text-anchor: middle; pointer-events: none; }
 .topo-tier-label { font-family: var(--font-sans); font-size: 10px; fill: var(--color-text-faint); text-transform: uppercase; letter-spacing: 2px; pointer-events: none; }
 .topo-bw-label { font-family: var(--font-sans); font-size: 10px; fill: var(--color-primary); font-weight: 600; text-anchor: middle; pointer-events: none; }
+.topo-rack-boundary { fill: none; stroke: var(--color-border); stroke-width: 1; stroke-dasharray: 6 3; opacity: 0.5; }
+.topo-rack-label { font-family: var(--font-sans); font-size: 10px; fill: var(--color-text-muted); font-weight: 600; text-anchor: middle; pointer-events: none; }
 
 /* Spine click hint */
 .topology-hint {
