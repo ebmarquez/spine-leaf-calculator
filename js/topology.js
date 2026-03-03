@@ -33,10 +33,8 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
   // Layout constants
   const margin = { top: 20, left: 70, right: 30, bottom: 20 };
   const tierGap = 100;
-  const nodeW = { spine: 100, leaf: 110, host: 22 };
-  const nodeH = { spine: 40, leaf: 34, host: 14 };
-  const hostRowH = 18;
-  const maxHostCols = 6;
+  const nodeW = { spine: 100, leaf: 110, host: 130 };
+  const nodeH = { spine: 40, leaf: 34, host: 36 };
 
   // Calculate SVG dimensions
   const maxCount = Math.max(spineCount, leafCount);
@@ -44,10 +42,8 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
   const contentW = maxCount * unitW;
   const svgW = margin.left + contentW + margin.right;
 
-  // Host area height
-  const maxNodesOnLeaf = Math.max(...nodesPerLeaf);
-  const hostRows = Math.ceil((maxNodesOnLeaf * nicsPerNode) / maxHostCols);
-  const hostAreaH = hostRows * hostRowH + 40;
+  // Host area: one block per rack
+  const hostAreaH = nodeH.host + 50;
   const svgH = margin.top + nodeH.spine + tierGap + nodeH.leaf + tierGap * 0.8 + hostAreaH + margin.bottom;
 
   const svg = svgEl('svg', {
@@ -166,29 +162,40 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
     });
   }
 
-  // Draw rack boundary rectangles when dual-homed
-  if (leavesPerRack > 1) {
-    for (let r = 0; r < totalRacks; r++) {
-      const firstLeafIdx = r * leavesPerRack;
-      const lastLeafIdx = firstLeafIdx + leavesPerRack - 1;
-      const firstPos = leafPositions[firstLeafIdx];
-      const lastPos = leafPositions[lastLeafIdx];
-      const rackX = firstPos.x - 8;
-      const rackW = (lastPos.x + nodeW.leaf) - firstPos.x + 16;
-      const rackRect = svgEl('rect', {
-        x: rackX, y: leafY - 10,
-        width: rackW, height: svgH - leafY + 5,
-        rx: 8, class: 'topo-rack-boundary',
-      });
-      svg.appendChild(rackRect);
-
-      // Rack label
-      svg.appendChild(svgText(
-        rackX + rackW / 2, leafY - 16,
-        `Rack ${r + 1}`,
-        'topo-rack-label'
-      ));
+  // Build rack-to-leaf mapping and node ranges
+  const racks = [];
+  let nodeOffset = 0;
+  for (let r = 0; r < totalRacks; r++) {
+    const leafIndices = [];
+    for (let l = 0; l < leavesPerRack; l++) {
+      leafIndices.push(r * leavesPerRack + l);
     }
+    const rackNodes = nodesPerLeaf[r * leavesPerRack]; // all leaves in rack see same node count
+    const startNode = nodeOffset + 1;
+    const endNode = nodeOffset + rackNodes;
+    nodeOffset += rackNodes;
+    racks.push({ idx: r, leafIndices, nodeCount: rackNodes, startNode, endNode });
+  }
+
+  // Draw rack boundary rectangles
+  for (const rack of racks) {
+    const firstPos = leafPositions[rack.leafIndices[0]];
+    const lastPos = leafPositions[rack.leafIndices[rack.leafIndices.length - 1]];
+    const rackX = firstPos.x - 12;
+    const rackW = (lastPos.x + nodeW.leaf) - firstPos.x + 24;
+    const rackRect = svgEl('rect', {
+      x: rackX, y: leafY - 12,
+      width: rackW, height: svgH - leafY + 8,
+      rx: 8, class: 'topo-rack-boundary',
+    });
+    svg.appendChild(rackRect);
+
+    // Rack label above boundary
+    svg.appendChild(svgText(
+      rackX + rackW / 2, leafY - 18,
+      `Rack ${rack.idx + 1}`,
+      'topo-rack-label'
+    ));
   }
 
   // Draw leaf nodes
@@ -218,52 +225,81 @@ export function renderTopology(container, fd, { onFailureChange } = {}) {
     g.appendChild(rect);
     g.appendChild(label);
     svg.appendChild(g);
+  }
 
-    // Draw host blocks under this leaf
-    // For dual-homed: each leaf sees nicsPerLeaf ports per node, not nicsPerNode
-    const portsOnThisLeaf = nodes * (nicsPerLeaf || nicsPerNode);
-    const cols = Math.min(portsOnThisLeaf, maxHostCols);
-    const rows = Math.ceil(portsOnThisLeaf / cols);
-    const hostBlockW = cols * (nodeW.host + 4);
-    const hostStartX = pos.cx - hostBlockW / 2;
+  // Draw one host block per rack with connections to each leaf
+  for (const rack of racks) {
+    // Center the host block under its rack's leaves
+    const firstPos = leafPositions[rack.leafIndices[0]];
+    const lastPos = leafPositions[rack.leafIndices[rack.leafIndices.length - 1]];
+    const rackCenterX = (firstPos.cx + lastPos.cx) / 2;
+    const hostBlockX = rackCenterX - nodeW.host / 2;
+    const hostBlockY = hostY;
 
-    // Host-to-leaf links
-    const linkStartY = pos.y + nodeH.leaf;
-    for (let c = 0; c < Math.min(cols, 4); c++) {
-      const hx = hostStartX + c * (nodeW.host + 4) + nodeW.host / 2;
-      svg.appendChild(svgEl('line', {
-        x1: pos.cx - 15 + c * 10,
-        y1: linkStartY,
-        x2: hx,
-        y2: hostY,
-        class: 'topo-link-host',
-      }));
-    }
+    // Host block rectangle
+    const hostRect = svgEl('rect', {
+      x: hostBlockX, y: hostBlockY,
+      width: nodeW.host, height: nodeH.host,
+      rx: 6, class: 'topo-host',
+    });
+    svg.appendChild(hostRect);
 
-    // Host rectangles
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const idx = r * cols + c;
-        if (idx >= portsOnThisLeaf) break;
-        svg.appendChild(svgEl('rect', {
-          x: hostStartX + c * (nodeW.host + 4),
-          y: hostY + r * hostRowH,
-          width: nodeW.host, height: nodeH.host,
-          rx: 3, class: 'topo-host',
-        }));
-      }
-    }
-
-    // Host count label — show rack number and NIC mapping
-    const hostRackIdx = Math.floor(l / leavesPerRack) + 1;
-    const nicLabel = leavesPerRack > 1
-      ? `${nicsPerLeaf}×${nicSpeed}G per leaf`
-      : `${nicsPerNode}×${nicSpeed}G`;
+    // Node range label inside block
+    const rangeLabel = rack.startNode === rack.endNode
+      ? `Node ${rack.startNode}`
+      : `Nodes ${rack.startNode}–${rack.endNode}`;
     svg.appendChild(svgText(
-      pos.cx, hostY + rows * hostRowH + 16,
-      `Rack ${hostRackIdx}: ${nodes} nodes · ${nicLabel}`,
+      rackCenterX, hostBlockY + nodeH.host / 2 + 1,
+      rangeLabel,
+      'topo-host-label'
+    ));
+
+    // NIC info label below block
+    const npl = nicsPerLeaf || nicsPerNode;
+    const nicInfo = leavesPerRack > 1
+      ? `${rack.nodeCount} nodes · ${nicsPerNode} NICs (${npl}×${nicSpeed}G per leaf)`
+      : `${rack.nodeCount} nodes · ${nicsPerNode}×${nicSpeed}G`;
+    svg.appendChild(svgText(
+      rackCenterX, hostBlockY + nodeH.host + 14,
+      nicInfo,
       'topo-label-muted'
     ));
+
+    // Connection lines from host block to each leaf in the rack
+    for (let i = 0; i < rack.leafIndices.length; i++) {
+      const leafIdx = rack.leafIndices[i];
+      const leafPos = leafPositions[leafIdx];
+      const leafBottomY = leafY + nodeH.leaf;
+
+      // Spread connection points across top of host block
+      const spread = Math.min(nodeW.host * 0.6, rack.leafIndices.length * 20);
+      const step = rack.leafIndices.length > 1 ? spread / (rack.leafIndices.length - 1) : 0;
+      const hostConnX = rackCenterX - spread / 2 + i * step;
+
+      // Spread from bottom of leaf
+      const leafSpread = Math.min(nodeW.leaf * 0.4, 30);
+      const leafStep = rack.leafIndices.length > 1 ? leafSpread / (rack.leafIndices.length - 1) : 0;
+      const leafConnX = leafPos.cx - leafSpread / 2 + (rack.leafIndices.length - 1 - i) * leafStep;
+
+      svg.appendChild(svgEl('line', {
+        x1: leafConnX,
+        y1: leafBottomY,
+        x2: hostConnX,
+        y2: hostBlockY,
+        class: 'topo-link-host',
+      }));
+
+      // NIC count annotation on link
+      if (npl < nicsPerNode) {
+        const midX = (leafConnX + hostConnX) / 2;
+        const midY = (leafBottomY + hostBlockY) / 2;
+        svg.appendChild(svgText(
+          midX + 8, midY + 3,
+          `${npl}×${nicSpeed}G`,
+          'topo-link-annotation'
+        ));
+      }
+    }
   }
 
   container.appendChild(svg);

@@ -389,10 +389,12 @@ body {
 .topo-spine:hover { filter: brightness(1.1); }
 .topo-spine.failed { opacity: 0.25; stroke: var(--color-danger); stroke-dasharray: 4 2; }
 .topo-leaf { fill: var(--color-info-bg); stroke: var(--color-info); stroke-width: 1.5; }
-.topo-host { fill: var(--color-info-bg); stroke: var(--color-info); stroke-width: 1; opacity: 0.85; }
+.topo-host { fill: var(--color-info-bg); stroke: var(--color-info); stroke-width: 1.5; }
+.topo-host-label { font-family: var(--font-sans); font-size: 11px; fill: var(--color-text); font-weight: 600; text-anchor: middle; pointer-events: none; }
 .topo-link { stroke: var(--color-primary); stroke-width: 1.5; opacity: 0.3; transition: opacity 0.2s; }
 .topo-link.failed { stroke: var(--color-danger); stroke-dasharray: 4 2; opacity: 0.15; }
-.topo-link-host { stroke: var(--color-text-muted); stroke-width: 0.8; opacity: 0.4; }
+.topo-link-host { stroke: var(--color-text-muted); stroke-width: 1.2; opacity: 0.5; }
+.topo-link-annotation { font-family: var(--font-sans); font-size: 8px; fill: var(--color-primary); font-weight: 600; pointer-events: none; }
 .topo-label { font-family: var(--font-sans); font-size: 11px; fill: var(--color-text); text-anchor: middle; pointer-events: none; }
 .topo-label-muted { font-family: var(--font-sans); font-size: 9px; fill: var(--color-text-muted); text-anchor: middle; pointer-events: none; }
 .topo-tier-label { font-family: var(--font-sans); font-size: 10px; fill: var(--color-text-faint); text-transform: uppercase; letter-spacing: 2px; pointer-events: none; }
