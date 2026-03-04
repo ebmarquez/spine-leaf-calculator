@@ -68,6 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   themeToggle.addEventListener('click', toggleTheme);
 
+  // Reset to defaults on logo/title click
+  const resetHandler = (e) => {
+    e.preventDefault();
+    resetDefaults();
+  };
+  document.getElementById('reset-logo')?.addEventListener('click', resetHandler);
+  document.getElementById('reset-title')?.addEventListener('click', resetHandler);
+
   // Initial calc
   recalculate();
 });
@@ -141,6 +149,21 @@ function getVal(id) {
   const el = inputs[id];
   if (!el) return 0;
   return el.tagName === 'SELECT' ? parseFloat(el.value) : parseFloat(el.value) || 0;
+}
+
+const DEFAULTS = {
+  'total-nodes': 64, 'nodes-per-rack': 16, 'nics-per-node': 2, 'nic-speed': 25,
+  'leaf-host-ports': 48, 'leaves-per-rack': 0, 'leaf-uplinks': 6, 'uplink-speed': 100,
+  'spine-count': 2, 'spine-ports': 36, 'target-ratio': 2.0,
+};
+
+function resetDefaults() {
+  for (const [id, val] of Object.entries(DEFAULTS)) {
+    const el = inputs[id];
+    if (el) el.value = val;
+  }
+  history.replaceState(null, '', window.location.pathname);
+  recalculate();
 }
 
 // ---------- Recalculate ----------

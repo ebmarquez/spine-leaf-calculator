@@ -110,13 +110,20 @@ body {
   font-weight: 800;
   font-size: 15px;
   flex-shrink: 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.15s;
 }
+.logo:hover { transform: scale(1.08); }
 
 .header-title {
   font-size: 20px;
   font-weight: 700;
   color: var(--color-text);
+  text-decoration: none;
+  cursor: pointer;
 }
+.header-title:hover { opacity: 0.8; }
 
 .header-title span {
   color: var(--color-primary);
